@@ -1,0 +1,694 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>NetDeck</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Concepto: consola de operaciones de red. Login a pantalla partida sobre una red animada, rejilla de servidores y, dentro de cada uno, un lienzo de topologia (estrella o bus) con un panel lateral por dispositivo. Un solo look oscuro, elegido a proposito. */
+:root{
+  --bg:#070b14;
+  --surface:#0d1528;
+  --surface-2:#121d38;
+  --console:#050810;
+  --line:#22325a;
+  --fg:#e8eefc;
+  --muted:#8c9bc0;
+  --accent:#3bc9ff;
+  --accent-rgb:59 201 255;
+  --accent-ink:#031420;
+  --ok:#4be38a;
+  --ok-rgb:75 227 138;
+  --warn:#ffc247;
+  --warn-rgb:255 194 71;
+  --crit:#ff5470;
+  --crit-rgb:255 84 112;
+  --font-display:'Chakra Petch','Rajdhani',system-ui,sans-serif;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--font-body);-webkit-font-smoothing:antialiased;min-height:100vh}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:inherit}
+.wrap{width:100%;max-width:1280px;margin-inline:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--font-mono)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* botones */
+.btn{font:600 14px/1 var(--font-body);padding:.85em 1.15em;border-radius:6px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);cursor:pointer;display:inline-flex;gap:.5em;align-items:center;justify-content:center;transition:border-color .15s,box-shadow .15s,background .15s}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{box-shadow:0 0 0 4px rgb(var(--accent-rgb)/.25)}
+.btn.sm{padding:.6em .8em;font-size:13px}
+.btn.danger{border-color:rgb(var(--crit-rgb)/.6);color:var(--crit)}
+.btn.danger:hover{background:rgb(var(--crit-rgb)/.12);border-color:var(--crit)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:disabled:hover{border-color:var(--line);box-shadow:none}
+
+/* estado */
+.dot{--c:var(--ok);display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);flex:none}
+.dot.warn,.dot.boot{--c:var(--warn)}
+.dot.down{--c:var(--crit)}
+.dot.boot{animation:blink 1s ease-in-out infinite}
+@keyframes blink{50%{opacity:.25}}
+.chip{font:500 11px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;padding:.5em .7em;border:1px solid var(--line);border-radius:4px;color:var(--muted);white-space:nowrap}
+.chip.accent{color:var(--accent);border-color:rgb(var(--accent-rgb)/.5)}
+
+/* ---------- LOGIN ---------- */
+.login{position:relative;overflow:hidden;min-height:100vh;display:grid;align-items:center}
+.login::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 55% at 18% 30%,rgb(var(--accent-rgb)/.16),transparent 70%),radial-gradient(40% 40% at 90% 90%,rgb(var(--accent-rgb)/.08),transparent 70%)}
+#bg{position:absolute;inset:0;width:100%;height:100%}
+.login-grid{position:relative;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:56px;align-items:center;padding-block:56px}
+.eyebrow{font:500 12px/1 var(--font-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+.hero h1{font:700 clamp(3.4rem,10vw,7.2rem)/.9 var(--font-display);letter-spacing:-.02em;text-transform:uppercase;margin-top:18px}
+.hero h1 span{color:var(--accent);text-shadow:0 0 40px rgb(var(--accent-rgb)/.55)}
+.hero p.lead{max-width:46ch;color:var(--muted);font-size:1.1rem;margin-top:22px}
+.hero-stats{display:flex;flex-wrap:wrap;gap:12px 36px;margin-top:36px}
+.hero-stats div{display:grid;gap:2px}
+.hero-stats b{font:600 1.9rem/1 var(--font-display)}
+.hero-stats span{font:400 11px/1.2 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.login-card{background:rgb(13 21 40/.88);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:8px;padding:30px;display:grid;gap:18px;box-shadow:0 30px 80px -20px rgb(0 0 0/.7),0 0 70px -25px rgb(var(--accent-rgb)/.5)}
+.login-card h2{font:600 1.5rem/1.2 var(--font-display)}
+.field{display:grid;gap:6px}
+.field label{font:500 12px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.field input{font:400 15px/1 var(--font-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:.95em 1em;width:100%}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgb(var(--accent-rgb)/.25)}
+.err{color:var(--crit);font-size:14px;background:rgb(var(--crit-rgb)/.1);border:1px solid rgb(var(--crit-rgb)/.4);border-radius:6px;padding:.7em .9em}
+.hint{font:400 12px/1.4 var(--font-mono);color:var(--muted)}
+.hint b{color:var(--fg);font-weight:500}
+.shake{animation:shake .4s}
+@keyframes shake{20%,60%{translate:-7px 0}40%,80%{translate:7px 0}}
+@media (max-width:820px){.login-grid{grid-template-columns:minmax(0,1fr);gap:32px;padding-block:36px}.login{align-items:start}}
+
+/* ---------- CABECERA ---------- */
+.top{border-bottom:1px solid var(--line);background:rgb(7 11 20/.85)}
+.top-in{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px}
+.brand{display:flex;align-items:center;gap:10px;font:700 1.25rem/1 var(--font-display);letter-spacing:.04em;text-transform:uppercase}
+.brand svg{color:var(--accent)}
+.who{display:flex;align-items:center;gap:12px}
+.who .u{font:500 13px/1 var(--font-mono);color:var(--muted);display:flex;align-items:center;gap:8px}
+.who .u i{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font-style:normal;color:var(--accent);text-transform:uppercase}
+
+/* ---------- SERVIDORES ---------- */
+main{padding-block:36px 64px}
+.page-head{display:grid;gap:8px;margin-bottom:28px}
+.page-head h1{font:700 clamp(2rem,5vw,3rem)/1.05 var(--font-display);text-wrap:balance}
+.page-head p{color:var(--muted);max-width:62ch}
+.sites{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:20px}
+.site{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-rows:auto 1fr;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s;min-width:0}
+.site:hover,.site:focus-visible{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 18px 50px -20px rgb(var(--accent-rgb)/.55)}
+.site:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.prev{background-color:var(--console);background-image:linear-gradient(rgb(var(--accent-rgb)/.07) 1px,transparent 1px),linear-gradient(90deg,rgb(var(--accent-rgb)/.07) 1px,transparent 1px);background-size:20px 20px;border-bottom:1px solid var(--line);padding:10px}
+.prev svg{display:block;width:100%;height:auto;max-height:150px}
+.prev .pl{stroke:var(--line);stroke-width:1.4}
+.prev .pl.t{stroke:rgb(var(--accent-rgb)/.6);stroke-width:2.5}
+.prev .pd{fill:var(--ok)}
+.prev .pd.warn,.prev .pd.boot{fill:var(--warn)}
+.prev .pd.down{fill:var(--crit)}
+.prev .ph{fill:var(--accent)}
+.site-body{padding:16px 18px 18px;display:grid;gap:10px;align-content:start}
+.site-head{display:flex;justify-content:space-between;align-items:start;gap:10px}
+.site-head h2{font:600 1.3rem/1.2 var(--font-display)}
+.loc{color:var(--muted);font-size:14px}
+.site-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:4px;font-size:13px}
+.stat{display:inline-flex;align-items:center;gap:7px}
+.net{color:var(--muted);font-size:12px;margin-left:auto}
+.go{font:600 13px/1 var(--font-body);color:var(--accent);margin-top:4px}
+.demo-note{font:400 12px/1.5 var(--font-mono);color:var(--muted);margin-top:26px}
+
+/* ---------- VISTA DE SERVIDOR ---------- */
+.site-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:20px}
+.site-top .ttl{display:grid;gap:10px;min-width:0}
+.site-top h1{font:700 clamp(1.8rem,4.5vw,2.8rem)/1.05 var(--font-display)}
+.metaline{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;color:var(--muted);font-size:14px}
+.tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{background:none;border:0;padding:.75em 1.1em;font:600 13px/1 var(--font-body);color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.sumrow{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.sum{display:inline-flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:.65em .9em;font-size:14px}
+.sum b{font:600 1.1rem/1 var(--font-display)}
+.panel{border:1px solid var(--line);border-radius:8px;background:var(--console);overflow:hidden}
+#stage-scroll{overflow-x:auto;overflow-y:hidden}
+#stage{position:relative;background-image:linear-gradient(rgb(var(--accent-rgb)/.055) 1px,transparent 1px),linear-gradient(90deg,rgb(var(--accent-rgb)/.055) 1px,transparent 1px);background-size:40px 40px}
+#stage svg.links{position:absolute;left:0;top:0}
+.legend{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:14px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.scrollhint{font:400 12px/1 var(--font-mono);color:var(--muted);margin-top:10px}
+
+.link{fill:none}
+.link.base{stroke:var(--line);stroke-width:2}
+.link.base.warn,.link.base.boot{stroke:rgb(var(--warn-rgb)/.5)}
+.link.base.down{stroke:rgb(var(--crit-rgb)/.75);stroke-dasharray:3 7}
+.link.flow{stroke:var(--accent);stroke-width:2;stroke-dasharray:4 12;stroke-linecap:round;animation:flow 1s linear infinite}
+.link.flow.warn,.link.flow.boot{stroke:var(--warn)}
+@keyframes flow{to{stroke-dashoffset:-16}}
+.trunk{stroke:rgb(var(--accent-rgb)/.3);stroke-width:7;stroke-linecap:round;fill:none}
+.trunk.down{stroke:rgb(var(--crit-rgb)/.4)}
+.term{stroke:var(--accent);stroke-width:4;stroke-linecap:round}
+.ring{fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:2 8;opacity:.8}
+.junc{fill:var(--ok)}
+.junc.warn,.junc.boot{fill:var(--warn)}
+.junc.down{fill:var(--crit)}
+.svgt{fill:var(--muted);font:11px var(--font-mono);letter-spacing:.1em}
+
+.node{position:absolute;width:0;height:0;z-index:1}
+.card{position:absolute;left:0;top:0;translate:-50% -50%;width:168px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 12px 12px;display:grid;gap:9px;animation:pop .35s ease-out}
+.still .card{animation:none}
+@keyframes pop{from{scale:.93}to{scale:1}}
+.card.hub{width:196px;border-color:rgb(var(--accent-rgb)/.7);box-shadow:0 0 0 1px rgb(var(--accent-rgb)/.2),0 0 44px -10px rgb(var(--accent-rgb)/.55);background:linear-gradient(180deg,rgb(var(--accent-rgb)/.1),var(--surface) 60%)}
+.card.warn,.card.boot{border-color:rgb(var(--warn-rgb)/.6)}
+.card.down{border-color:rgb(var(--crit-rgb)/.65);background:linear-gradient(180deg,rgb(var(--crit-rgb)/.1),var(--surface) 70%)}
+.card .tag{font:500 10px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.card .row{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:center}
+.ico{display:grid;place-items:center;width:34px;height:34px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);color:var(--accent)}
+.card.warn .ico,.card.boot .ico{color:var(--warn)}
+.card.down .ico{color:var(--crit)}
+.card h3{font:600 14px/1.2 var(--font-display);letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .ip{font:500 13px/1.3 var(--font-mono);color:var(--accent)}
+.card .state{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+
+/* ---------- PANEL LATERAL ---------- */
+.shade{position:fixed;inset:0;background:rgb(3 6 12/.62);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
+.shade.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(500px,100%);background:var(--surface);border-left:1px solid var(--line);z-index:50;display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s .3s;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer.open{transform:none;visibility:visible;transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.d-head{display:flex;gap:14px;align-items:flex-start;padding:20px 20px 16px;border-bottom:1px solid var(--line)}
+.d-head .ico{width:46px;height:46px;flex:none}
+.d-head .tt{min-width:0;flex:1;display:grid;gap:4px}
+.d-head h2{font:700 1.5rem/1.1 var(--font-display);overflow-wrap:anywhere}
+.d-head .sub{color:var(--muted);font-size:14px}
+.x{background:none;border:1px solid var(--line);border-radius:6px;width:36px;height:36px;display:grid;place-items:center;cursor:pointer;color:var(--muted);flex:none}
+.x:hover{border-color:var(--accent);color:var(--fg)}
+.d-body{overflow-y:auto;padding:18px 20px 28px;display:grid;gap:24px;align-content:start}
+.pill{display:inline-flex;align-items:center;gap:8px;font:600 12px/1 var(--font-body);padding:.5em .8em;border-radius:99px;border:1px solid rgb(var(--ok-rgb)/.5);color:var(--ok);background:rgb(var(--ok-rgb)/.08);width:max-content}
+.pill.warn,.pill.boot{border-color:rgb(var(--warn-rgb)/.5);color:var(--warn);background:rgb(var(--warn-rgb)/.08)}
+.pill.down{border-color:rgb(var(--crit-rgb)/.5);color:var(--crit);background:rgb(var(--crit-rgb)/.08)}
+.sec h4{margin:0 0 12px;font:500 11px/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.alert{border:1px solid rgb(var(--warn-rgb)/.5);background:rgb(var(--warn-rgb)/.08);border-radius:6px;padding:.8em 1em;font-size:14px}
+.alert.down{border-color:rgb(var(--crit-rgb)/.5);background:rgb(var(--crit-rgb)/.08)}
+.acts{display:flex;flex-wrap:wrap;gap:10px}
+.gauge{display:grid;grid-template-columns:70px minmax(0,1fr) 46px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+.gauge span{color:var(--muted)}
+.gauge b{font:500 13px/1 var(--font-mono);text-align:right}
+.bar{height:8px;border-radius:4px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .6s ease}
+.bar i.warn{background:var(--warn)}
+.bar i.crit{background:var(--crit)}
+.kv{display:grid;grid-template-columns:132px minmax(0,1fr);gap:9px 12px;margin:0;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--font-mono);font-size:13px;overflow-wrap:anywhere}
+.svc{display:grid;gap:8px}
+.svc div{display:grid;grid-template-columns:minmax(0,1fr) 56px 82px;gap:10px;align-items:center;padding:.65em .8em;background:var(--bg);border:1px solid var(--line);border-radius:6px;font-size:14px}
+.svc .p{font:400 12px/1 var(--font-mono);color:var(--muted)}
+.svc .s{font:600 11px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ok);text-align:right}
+.svc .s.off{color:var(--crit)}
+.con{background:var(--console);border:1px solid var(--line);border-radius:6px;padding:12px;font:400 12.5px/1.6 var(--font-mono);height:190px;overflow:auto;color:#b8c4e4}
+.con div{overflow-wrap:anywhere}
+.con .cmd{color:var(--accent)}
+.con .bad{color:var(--crit)}
+.con .good{color:var(--ok)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+
+  <!-- LOGIN -->
+  <section id="v-login" class="login">
+    <canvas id="bg" aria-hidden="true"></canvas>
+    <div class="wrap login-grid">
+      <div class="hero">
+        <p class="eyebrow">Administración de servidores y redes</p>
+        <h1>Net<span>Deck</span></h1>
+        <p class="lead">Entra, elige un servidor y recorre su red dispositivo a dispositivo: direcciones IP, estado, recursos y servicios en un solo panel.</p>
+        <div class="hero-stats" id="hero-stats"></div>
+      </div>
+      <form id="f-login" class="login-card" novalidate>
+        <h2>Iniciar sesión</h2>
+        <div class="field">
+          <label for="u">Usuario</label>
+          <input id="u" name="u" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+        </div>
+        <div class="field">
+          <label for="p">Contraseña</label>
+          <input id="p" name="p" type="password" autocomplete="current-password" required>
+        </div>
+        <p class="err" id="login-err" role="alert" hidden>Usuario o contraseña incorrectos.</p>
+        <button class="btn primary" type="submit">Entrar a la consola</button>
+        <p class="hint">Acceso de prueba: usuario <b>admin</b> · contraseña <b>admin</b></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- APLICACION -->
+  <div id="shell" hidden>
+    <header class="top">
+      <div class="wrap top-in">
+        <div class="brand">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="13" cy="13" r="3.2" fill="currentColor"/><path d="M13 9.8V3M13 16.2V23M9.8 13H3M16.2 13H23"/><circle cx="13" cy="3" r="1.6"/><circle cx="13" cy="23" r="1.6"/><circle cx="3" cy="13" r="1.6"/><circle cx="23" cy="13" r="1.6"/></svg>
+          NetDeck
+        </div>
+        <div class="who">
+          <span class="u"><i>a</i>admin</span>
+          <button class="btn sm" id="logout" type="button">Cerrar sesión</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- lista de servidores -->
+      <section id="v-sites" class="wrap">
+        <div class="page-head">
+          <h1 id="h-sites" tabindex="-1">Elige un servidor</h1>
+          <p>Cada servidor agrupa los dispositivos de una red. Entra en uno para ver su topología y administrar cada equipo.</p>
+        </div>
+        <div class="sites" id="sites-grid"></div>
+        <p class="demo-note">Datos de ejemplo: las redes, direcciones y dispositivos son simulados.</p>
+      </section>
+
+      <!-- vista de un servidor -->
+      <section id="v-site" class="wrap" hidden>
+        <div class="site-top">
+          <div class="ttl">
+            <div><button class="btn sm" id="back" type="button">← Servidores</button></div>
+            <h1 id="s-name" tabindex="-1"></h1>
+            <div class="metaline" id="s-meta"></div>
+          </div>
+          <div class="tools">
+            <span class="eyebrow" style="color:var(--muted)">Topología</span>
+            <div class="seg" id="seg" role="group" aria-label="Tipo de topología">
+              <button type="button" data-mode="star" aria-pressed="true">Estrella</button>
+              <button type="button" data-mode="bus" aria-pressed="false">Bus</button>
+            </div>
+          </div>
+        </div>
+        <div class="sumrow" id="sumrow"></div>
+        <div class="panel"><div id="stage-scroll"><div id="stage"></div></div></div>
+        <div class="legend">
+          <span><i class="dot ok"></i>En línea</span>
+          <span><i class="dot warn"></i>Atención</span>
+          <span><i class="dot down"></i>Sin respuesta</span>
+          <span class="mono" style="font-size:12px">Las líneas con movimiento indican enlace activo</span>
+        </div>
+        <p class="scrollhint" id="scrollhint">Desliza el diagrama en horizontal para ver toda la red.</p>
+      </section>
+    </main>
+  </div>
+
+  <!-- panel lateral de dispositivo -->
+  <div class="shade" id="shade"></div>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title" aria-hidden="true">
+    <div id="d-root" style="display:flex;flex-direction:column;min-height:0;height:100%"></div>
+  </aside>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+
+/* ---------- iconos ---------- */
+var ICONS={
+  router:'<rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 17h.01M11 17h.01M7 14V9M17 14V9M12 14V6"/>',
+  switch:'<rect x="2" y="8" width="20" height="8" rx="1.5"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/>',
+  server:'<rect x="3" y="3" width="18" height="7" rx="1.5"/><rect x="3" y="14" width="18" height="7" rx="1.5"/><path d="M7 6.5h.01M7 17.5h.01M12 6.5h5M12 17.5h5"/>',
+  firewall:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  pc:'<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/>',
+  printer:'<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="1.5"/><path d="M7 14h10v7H7z"/>',
+  nas:'<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  ap:'<path d="M3 9a13 13 0 0 1 18 0M6 12.5a8.5 8.5 0 0 1 12 0M9 16a4 4 0 0 1 6 0"/><path d="M12 19.5h.01"/>',
+  camera:'<path d="M3 8h13a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3z"/><path d="M17 11l4-2v6l-4-2"/>',
+  iot:'<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>'
+};
+function ico(t,sz){sz=sz||20;return '<svg viewBox="0 0 24 24" width="'+sz+'" height="'+sz+'" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[t]||ICONS.server)+'</svg>'}
+var TYPES={router:'Router',switch:'Switch',server:'Servidor',firewall:'Firewall',pc:'Equipo de usuario',printer:'Impresora',nas:'Almacenamiento NAS',ap:'Punto de acceso Wi-Fi',camera:'Cámara IP',iot:'Dispositivo IoT'};
+var STATUS={ok:'En línea',warn:'Atención',down:'Sin respuesta',boot:'Reiniciando'};
+
+/* ---------- datos ---------- */
+function mac(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0}
+  var b=[h>>>24&255,h>>>16&255,h>>>8&255,h&255].map(function(v){return v.toString(16).padStart(2,'0').toUpperCase()});return '00:1A:'+b.join(':')}
+function dev(id,name,type,ip,st,model,os,cpu,ram,disk,up,svc,note){
+  return {id:id,name:name,type:type,ip:ip,st:st,model:model,os:os,cpu:cpu,ram:ram,disk:disk,up:up,svc:svc,note:note||'',mac:mac(id),log:[],busy:false,armed:false}
+}
+var SITES=[
+ {id:'mad',name:'CPD Madrid',loc:'Madrid · Sala 2, rack A',topo:'star',cidr:'10.10.0.0/24',gw:'10.10.0.1',pp:'Gi1/0/',
+  hub:dev('mad-sw','SW-CORE-01','switch','10.10.0.2','ok','Cisco Catalyst 9300-48P','IOS-XE 17.9.4',12,38,24,2184,[['SSH',22],['SNMP',161],['NETCONF',830]]),
+  devices:[
+   dev('mad-fw','FW-EDGE','firewall','10.10.0.1','ok','FortiGate 100F','FortiOS 7.4.3',21,46,18,3120,[['VPN IPsec',500],['Admin HTTPS',443],['DHCP',67]]),
+   dev('mad-web','SRV-WEB-01','server','10.10.0.11','ok','Dell PowerEdge R650','Ubuntu Server 24.04 LTS',34,61,47,1056,[['nginx',443],['SSH',22],['node-exporter',9100]]),
+   dev('mad-db','SRV-DB-01','server','10.10.0.12','warn','Dell PowerEdge R750','Debian 12',58,78,91,640,[['PostgreSQL',5432],['SSH',22],['pgBackRest',8432]],'El disco de datos está al 91 %. Conviene ampliarlo o purgar los WAL antes del fin de semana.'),
+   dev('mad-app','SRV-APP-02','server','10.10.0.13','ok','HPE ProLiant DL360 Gen10','Ubuntu Server 22.04 LTS',42,67,52,812,[['Docker API',2376],['App API',8080],['SSH',22]]),
+   dev('mad-nas','NAS-BACKUP','nas','10.10.0.20','ok','Synology RS1221+','DSM 7.2.1',9,33,72,4280,[['SMB',445],['NFS',2049],['rsync',873]]),
+   dev('mad-mail','SRV-MAIL','server','10.10.0.14','ok','Dell PowerEdge R450','Rocky Linux 9.3',27,54,39,1430,[['SMTP',25],['IMAPS',993],['SSH',22]]),
+   dev('mad-dns','SRV-DNS','server','10.10.0.5','down','Dell PowerEdge R250','Debian 12',0,0,0,0,[['DNS',53],['SSH',22]],'No responde a ICMP desde las 08:12. Revisa la alimentación y el puerto del switch.'),
+   dev('mad-cam','CAM-CPD-01','camera','10.10.0.40','ok','Axis P3245-LVE','AXIS OS 11.9',31,40,55,2900,[['RTSP',554],['HTTPS',443]])
+  ]},
+ {id:'bad',name:'Oficina Badajoz',loc:'Badajoz · Planta 1',topo:'bus',cidr:'192.168.10.0/24',gw:'192.168.10.1',pp:'ether',
+  hub:dev('bad-rt','RTR-BAD-01','router','192.168.10.1','ok','MikroTik RB4011iGS+','RouterOS 7.14',14,29,12,1920,[['WinBox',8291],['SSH',22],['DHCP',67],['DNS',53]]),
+  devices:[
+   dev('bad-pc1','PC-RECEPCION','pc','192.168.10.21','ok','HP EliteDesk 800 G6','Windows 11 Pro 23H2',18,52,61,96,[['RDP',3389],['SMB',445]]),
+   dev('bad-pc2','PC-ADMIN-01','pc','192.168.10.22','ok','Lenovo ThinkCentre M70q','Windows 11 Pro 23H2',24,58,44,148,[['RDP',3389],['SMB',445]]),
+   dev('bad-pc3','PC-ADMIN-02','pc','192.168.10.23','down','Lenovo ThinkCentre M70q','Windows 10 Pro 22H2',0,0,0,0,[['RDP',3389],['SMB',445]],'Equipo apagado desde ayer a las 19:40.'),
+   dev('bad-prn','PRN-HP-02','printer','192.168.10.40','warn','HP LaserJet Pro M507','FutureSmart 5.8',4,22,15,720,[['IPP',631],['HTTPS',443],['JetDirect',9100]],'Tóner negro al 8 %. Conviene pedir un repuesto.'),
+   dev('bad-nas','NAS-OFI','nas','192.168.10.50','ok','QNAP TS-464','QTS 5.1.7',11,41,66,2210,[['SMB',445],['HTTPS',443]]),
+   dev('bad-ap','AP-BAD-01','ap','192.168.10.60','ok','Ubiquiti U6 Pro','UniFi OS 7.0',7,35,22,1300,[['UniFi',8080],['SSH',22]])
+  ]},
+ {id:'cac',name:'Sede Cáceres',loc:'Cáceres · Edificio B',topo:'star',cidr:'172.16.20.0/24',gw:'172.16.20.1',pp:'Puerto ',
+  hub:dev('cac-sw','SW-CAC-01','switch','172.16.20.2','ok','Aruba 2930F 48G','ArubaOS-Switch 16.11',10,31,19,3600,[['SSH',22],['SNMP',161]]),
+  devices:[
+   dev('cac-rt','RTR-CAC','router','172.16.20.1','ok','Cisco ISR 4331','IOS-XE 17.6.5',16,37,21,5100,[['SSH',22],['BGP',179],['IPsec',500]]),
+   dev('cac-erp','SRV-ERP','server','172.16.20.10','ok','Lenovo ThinkSystem SR630','Windows Server 2022',39,72,58,1500,[['SQL Server',1433],['RDP',3389],['HTTPS',443]]),
+   dev('cac-files','SRV-FILES','server','172.16.20.11','warn','HPE ProLiant ML350','Windows Server 2019',22,49,63,980,[['SMB',445],['RDP',3389]],'Hay 3 actualizaciones de seguridad pendientes de instalar.'),
+   dev('cac-nas','NAS-CAC','nas','172.16.20.20','ok','Synology DS1621+','DSM 7.2.1',8,30,58,3050,[['SMB',445],['HTTPS',5001]]),
+   dev('cac-ap1','AP-CAC-01','ap','172.16.20.60','ok','Aruba AP-515','ArubaOS 8.10',9,36,20,2100,[['HTTPS',4343],['SSH',22]]),
+   dev('cac-ap2','AP-CAC-02','ap','172.16.20.61','ok','Aruba AP-515','ArubaOS 8.10',11,38,20,2100,[['HTTPS',4343],['SSH',22]]),
+   dev('cac-cam','CAM-ENTRADA','camera','172.16.20.70','ok','Hikvision DS-2CD2143','V5.7.3',33,44,70,1800,[['RTSP',554],['HTTP',80]])
+  ]},
+ {id:'lab',name:'Laboratorio IoT',loc:'Mérida · Laboratorio 3',topo:'bus',cidr:'10.50.0.0/24',gw:'10.50.0.1',pp:'eth',
+  hub:dev('lab-gw','GW-LAB','router','10.50.0.1','ok','Teltonika RUTX11','RutOS 7.6',19,44,30,720,[['SSH',22],['MQTT bridge',8883],['DHCP',67]]),
+  devices:[
+   dev('lab-rpi','RPI-HUB','iot','10.50.0.11','ok','Raspberry Pi 5 8 GB','Raspberry Pi OS 12',28,41,37,360,[['SSH',22],['Node-RED',1880]]),
+   dev('lab-dock','DOCKER-LAB','server','10.50.0.12','ok','Intel NUC 13 Pro','Ubuntu Server 24.04 LTS',36,59,49,430,[['Docker API',2376],['Grafana',3000],['SSH',22]]),
+   dev('lab-mqtt','MQTT-BROKER','server','10.50.0.13','ok','Raspberry Pi 4 4 GB','Debian 12',17,48,41,640,[['MQTT',1883],['MQTTS',8883],['SSH',22]]),
+   dev('lab-t1','ESP-TEMP-01','iot','10.50.0.31','ok','ESP32-S3 DevKit','ESP-IDF 5.2',12,34,28,168,[['MQTT',1883],['OTA',3232]]),
+   dev('lab-t2','ESP-TEMP-02','iot','10.50.0.32','down','ESP32-S3 DevKit','ESP-IDF 5.2',0,0,0,0,[['MQTT',1883],['OTA',3232]],'Sin latidos MQTT desde hace 3 h. Posible batería agotada.'),
+   dev('lab-cam','CAM-LAB','camera','10.50.0.40','ok','Reolink RLC-510A','v3.1.0',29,38,62,540,[['RTSP',554],['HTTP',80]]),
+   dev('lab-plc','PLC-01','iot','10.50.0.50','ok','Siemens S7-1200 1214C','FW 4.5',15,26,33,4300,[['S7comm',102],['HTTPS',443]])
+  ]}
+];
+function all(s){return [s.hub].concat(s.devices)}
+function counts(s){var a=all(s);return{n:a.length,
+  ok:a.filter(function(d){return d.st==='ok'}).length,
+  warn:a.filter(function(d){return d.st==='warn'||d.st==='boot'}).length,
+  down:a.filter(function(d){return d.st==='down'}).length}}
+
+/* ---------- estado ---------- */
+var S={site:null,mode:'star',dev:null,opener:null,timer:null,lastW:0};
+function site(){return SITES.filter(function(s){return s.id===S.site})[0]}
+function findDev(id){var s=site();return all(s).filter(function(d){return d.id===id})[0]}
+
+/* ---------- fondo animado del login ---------- */
+var bg={raf:0,on:false};
+function startBg(){
+  var c=$('#bg'),x=c.getContext('2d'),dpr=Math.min(window.devicePixelRatio||1,2),w=0,h=0,pts=[];
+  var rgb=getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim().split(/\s+/).join(',');
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function size(){
+    w=c.clientWidth;h=c.clientHeight;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0);
+    var n=Math.round(Math.min(80,Math.max(24,w*h/17000)));pts=[];
+    for(var i=0;i<n;i++)pts.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()<.12?3.2:1.6});
+  }
+  function draw(){
+    x.clearRect(0,0,w,h);
+    for(var i=0;i<pts.length;i++){var p=pts[i];
+      if(!reduce){p.x+=p.vx;p.y+=p.vy;if(p.x<-10)p.x=w+10;if(p.x>w+10)p.x=-10;if(p.y<-10)p.y=h+10;if(p.y>h+10)p.y=-10}
+      for(var j=i+1;j<pts.length;j++){var q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<150){x.strokeStyle='rgba('+rgb+','+(0.26*(1-d/150)).toFixed(3)+')';x.lineWidth=1;x.beginPath();x.moveTo(p.x,p.y);x.lineTo(q.x,q.y);x.stroke()}}
+    }
+    for(var k=0;k<pts.length;k++){var u=pts[k];x.fillStyle='rgba('+rgb+','+(u.r>2?.9:.55)+')';x.beginPath();x.arc(u.x,u.y,u.r,0,6.2832);x.fill()}
+    if(bg.on&&!reduce)bg.raf=requestAnimationFrame(draw);
+  }
+  size();bg.on=true;draw();
+  if(!bg.bound){bg.bound=true;window.addEventListener('resize',function(){if(bg.on){size();if(reduce)draw()}})}
+}
+function stopBg(){bg.on=false;cancelAnimationFrame(bg.raf)}
+
+/* ---------- login ---------- */
+(function(){
+  var n=0,ok=0;SITES.forEach(function(s){var c=counts(s);n+=c.n;ok+=c.ok});
+  $('#hero-stats').innerHTML='<div><b>'+SITES.length+'</b><span>Servidores</span></div><div><b>'+n+'</b><span>Dispositivos</span></div><div><b>'+ok+'</b><span>En línea ahora</span></div>';
+})();
+$('#f-login').addEventListener('submit',function(e){
+  e.preventDefault();
+  var u=$('#u').value.trim(),p=$('#p').value,card=$('#f-login');
+  if(u==='admin'&&p==='admin'){enter()}
+  else{
+    $('#login-err').hidden=false;card.classList.remove('shake');void card.offsetWidth;card.classList.add('shake');$('#p').select();
+  }
+});
+function enter(){
+  stopBg();$('#v-login').hidden=true;$('#shell').hidden=false;
+  showSites();window.scrollTo(0,0);
+}
+$('#logout').addEventListener('click',function(){
+  closeDrawer();S.site=null;$('#shell').hidden=true;$('#v-login').hidden=false;
+  $('#u').value='';$('#p').value='';$('#login-err').hidden=true;startBg();$('#u').focus();
+});
+
+/* ---------- lista de servidores ---------- */
+function preview(s){
+  var a=s.devices,n=a.length,svg='<svg viewBox="0 0 160 84" aria-hidden="true">',i,x,y,t;
+  if(s.topo==='star'){
+    var cx=80,cy=42,pos=[];
+    for(i=0;i<n;i++){t=-Math.PI/2+i*2*Math.PI/n;x=cx+Math.cos(t)*60;y=cy+Math.sin(t)*30;pos.push([x,y]);svg+='<line class="pl" x1="'+cx+'" y1="'+cy+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'"/>'}
+    svg+='<circle class="ph" cx="'+cx+'" cy="'+cy+'" r="6.5"/>';
+    for(i=0;i<n;i++)svg+='<circle class="pd '+a[i].st+'" cx="'+pos[i][0].toFixed(1)+'" cy="'+pos[i][1].toFixed(1)+'" r="4.2"/>';
+  }else{
+    var nt=Math.ceil(n/2),step=(146-40)/nt;
+    svg+='<line class="pl t" x1="14" y1="42" x2="152" y2="42"/>';
+    var pts=[];
+    for(i=0;i<n;i++){var top=i%2===0,j=Math.floor(i/2);x=40+(j+(top?.3:.75))*step;y=top?14:70;pts.push([x,y]);svg+='<line class="pl" x1="'+x.toFixed(1)+'" y1="'+y+'" x2="'+x.toFixed(1)+'" y2="42"/>'}
+    svg+='<circle class="ph" cx="14" cy="42" r="6.5"/>';
+    for(i=0;i<n;i++)svg+='<circle class="pd '+a[i].st+'" cx="'+pts[i][0].toFixed(1)+'" cy="'+pts[i][1]+'" r="4.2"/>';
+  }
+  return svg+'</svg>';
+}
+function renderSites(){
+  $('#sites-grid').innerHTML=SITES.map(function(s){
+    var c=counts(s);
+    return '<button type="button" class="site" data-site="'+s.id+'" aria-label="Administrar '+s.name+'">'+
+      '<div class="prev">'+preview(s)+'</div>'+
+      '<div class="site-body"><div class="site-head"><h2>'+s.name+'</h2><span class="chip accent">'+(s.topo==='star'?'Estrella':'Bus')+'</span></div>'+
+      '<p class="loc">'+s.loc+'</p>'+
+      '<div class="site-foot"><span class="stat" title="En línea"><i class="dot ok"></i>'+c.ok+'/'+c.n+' en línea</span>'+
+      (c.warn?'<span class="stat" title="Con alertas"><i class="dot warn"></i>'+c.warn+'</span>':'')+
+      (c.down?'<span class="stat" title="Sin respuesta"><i class="dot down"></i>'+c.down+'</span>':'')+
+      '<span class="net">'+s.cidr+'</span></div>'+
+      '<span class="go">Administrar →</span></div></button>';
+  }).join('');
+}
+function showSites(){
+  S.site=null;renderSites();$('#v-site').hidden=true;$('#v-sites').hidden=false;$('#h-sites').focus({preventScroll:true});
+}
+$('#sites-grid').addEventListener('click',function(e){
+  var b=e.target.closest('.site');if(b)openSite(b.getAttribute('data-site'));
+});
+$('#back').addEventListener('click',function(){closeDrawer();showSites();window.scrollTo(0,0)});
+
+/* ---------- vista de servidor ---------- */
+function openSite(id){
+  S.site=id;var s=site();S.mode=s.topo;
+  $('#v-sites').hidden=true;$('#v-site').hidden=false;
+  $('#s-name').textContent=s.name;
+  $('#s-meta').innerHTML='<span>'+s.loc+'</span><span class="chip">'+s.cidr+'</span><span class="chip">Gateway '+s.gw+'</span>';
+  paintSeg();updateSummary();renderStage(true);
+  window.scrollTo(0,0);$('#s-name').focus({preventScroll:true});
+}
+function paintSeg(){$$('#seg button').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-mode')===S.mode?'true':'false')})}
+$('#seg').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-mode]');if(!b||b.getAttribute('data-mode')===S.mode)return;
+  S.mode=b.getAttribute('data-mode');paintSeg();renderStage(true);
+});
+function updateSummary(){
+  var s=site();if(!s)return;var c=counts(s);
+  $('#sumrow').innerHTML=
+    '<span class="sum"><i class="dot ok"></i><b>'+c.ok+'</b> en línea</span>'+
+    '<span class="sum"><i class="dot warn"></i><b>'+c.warn+'</b> con alertas</span>'+
+    '<span class="sum"><i class="dot down"></i><b>'+c.down+'</b> sin respuesta</span>'+
+    '<span class="sum"><b>'+c.n+'</b> dispositivos</span>';
+}
+
+function link(x1,y1,x2,y2,st){
+  var a='x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'"';
+  return '<line class="link base '+st+'" '+a+'/>'+(st==='down'?'':'<line class="link flow '+st+'" '+a+'/>');
+}
+function layout(s,mode,W){
+  var n=s.devices.length,pos={},svg='',H,i,d;
+  if(mode==='star'){
+    H=n>6?760:680;var cx=W/2,cy=H/2,rx=Math.min(W*0.37,480),ry=H*0.36;
+    pos[s.hub.id]={x:cx,y:cy};
+    svg+='<ellipse class="ring" cx="'+cx+'" cy="'+cy+'" rx="'+(rx*.5).toFixed(1)+'" ry="'+(ry*.5).toFixed(1)+'"/><ellipse class="ring" cx="'+cx+'" cy="'+cy+'" rx="'+rx.toFixed(1)+'" ry="'+ry.toFixed(1)+'"/>';
+    for(i=0;i<n;i++){d=s.devices[i];var t=-Math.PI/2+i*2*Math.PI/n;pos[d.id]={x:cx+Math.cos(t)*rx,y:cy+Math.sin(t)*ry};svg+=link(cx,cy,pos[d.id].x,pos[d.id].y,d.st)}
+  }else{
+    H=620;var my=H/2,x0=250,x1=W-70,nt=Math.ceil(n/2),step=(x1-x0)/nt,hx=110;
+    pos[s.hub.id]={x:hx,y:my};
+    var tc=s.hub.st==='down'?'down':'';
+    svg+='<line class="trunk '+tc+'" x1="'+hx+'" y1="'+my+'" x2="'+(W-50)+'" y2="'+my+'"/>';
+    if(s.hub.st!=='down')svg+='<line class="link flow '+s.hub.st+'" x1="'+hx+'" y1="'+my+'" x2="'+(W-50)+'" y2="'+my+'"/>';
+    svg+='<line class="term" x1="'+(W-50)+'" y1="'+(my-18)+'" x2="'+(W-50)+'" y2="'+(my+18)+'"/>';
+    svg+='<text class="svgt" x="'+(W-50)+'" y="'+(my-28)+'" text-anchor="end">TERMINADOR · 50 Ω</text>';
+    svg+='<text class="svgt" x="'+(hx+104)+'" y="'+(my+24)+'">BACKBONE · 1 Gbps</text>';
+    var drops='',juncs='';
+    for(i=0;i<n;i++){d=s.devices[i];var top=i%2===0,j=Math.floor(i/2),px=x0+(j+(top?.3:.75))*step,py=top?112:H-112;
+      pos[d.id]={x:px,y:py};
+      drops+=link(px,py,px,my,d.st);
+      juncs+='<circle class="junc '+d.st+'" cx="'+px.toFixed(1)+'" cy="'+my+'" r="5.5"/>';}
+    svg=drops+svg+juncs;
+  }
+  return {H:H,pos:pos,svg:svg};
+}
+function nodeHTML(d,p,isHub){
+  var tag=isHub?'<span class="tag">'+(S.mode==='star'?'Centro de la estrella':'Cabecera del bus')+'</span>':'';
+  return '<div class="node" style="left:'+p.x.toFixed(1)+'px;top:'+p.y.toFixed(1)+'px">'+
+    '<article class="card'+(isHub?' hub':'')+' '+d.st+'" aria-label="'+d.name+', '+d.ip+', '+STATUS[d.st]+'">'+tag+
+    '<div class="row"><span class="ico">'+ico(d.type)+'</span><div style="min-width:0"><h3>'+d.name+'</h3><p class="ip">'+d.ip+'</p></div></div>'+
+    '<div class="state"><i class="dot '+d.st+'"></i>'+STATUS[d.st]+'</div>'+
+    '<button type="button" class="btn sm" data-manage="'+d.id+'">Administrar</button></article></div>';
+}
+function renderStage(animate){
+  var s=site();if(!s||$('#v-site').hidden)return;
+  var box=$('#stage-scroll'),nt=Math.ceil(s.devices.length/2);
+  var W=Math.max(box.clientWidth,940,S.mode==='bus'?320+190*nt:0);
+  var L=layout(s,S.mode,W),st=$('#stage');
+  st.style.width=W+'px';st.style.height=L.H+'px';st.classList.toggle('still',!animate);
+  var html='<svg class="links" width="'+W+'" height="'+L.H+'" viewBox="0 0 '+W+' '+L.H+'" aria-hidden="true">'+L.svg+'</svg>';
+  html+=nodeHTML(s.hub,L.pos[s.hub.id],true);
+  s.devices.forEach(function(d){html+=nodeHTML(d,L.pos[d.id],false)});
+  st.innerHTML=html;
+  S.lastW=box.clientWidth;
+  $('#scrollhint').hidden=!(W>box.clientWidth+4);
+}
+$('#stage').addEventListener('click',function(e){
+  var b=e.target.closest('[data-manage]');if(b){S.opener=b;openDrawer(b.getAttribute('data-manage'))}
+});
+if(window.ResizeObserver){
+  new ResizeObserver(function(){
+    if($('#v-site').hidden)return;var w=$('#stage-scroll').clientWidth;
+    if(w!==S.lastW){S.lastW=w;renderStage(false)}
+  }).observe($('#stage-scroll'));
+}
+
+/* ---------- panel lateral ---------- */
+function fmtUp(h){if(!h)return '—';if(h<1)return 'menos de 1 h';var d=Math.floor(h/24),hh=Math.floor(h%24);return (d?d+' d ':'')+hh+' h'}
+var GN={cpu:'CPU',ram:'Memoria',disk:'Disco'};
+function lvl(v){return v>=85?'crit':v>=70?'warn':''}
+function live(d){return d.st==='ok'||d.st==='warn'}
+function line(t,c){return '<div'+(c?' class="'+c+'"':'')+'>'+t+'</div>'}
+function drawerHTML(d){
+  var s=site(),isHub=d===s.hub,idx=s.devices.indexOf(d)+2,lv=live(d);
+  var h='<div class="d-head"><span class="ico">'+ico(d.type,26)+'</span>'+
+    '<div class="tt"><h2 id="d-title">'+d.name+'</h2><p class="sub">'+TYPES[d.type]+' · '+d.model+'</p><span class="pill '+d.st+'"><i class="dot '+d.st+'"></i>'+STATUS[d.st]+'</span></div>'+
+    '<button type="button" class="x" id="d-close" aria-label="Cerrar panel"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg></button></div>';
+  h+='<div class="d-body">';
+  if(d.note&&d.st!=='boot')h+='<div class="alert '+(d.st==='down'?'down':'')+'" role="status">'+d.note+'</div>';
+  h+='<div class="sec"><h4>Acciones</h4><div class="acts">'+
+    '<button type="button" class="btn sm" data-act="ping">Hacer ping</button>'+
+    '<button type="button" class="btn sm" data-act="restart">Reiniciar</button>'+
+    '<button type="button" class="btn sm danger" data-act="power">Apagar</button></div></div>';
+  h+='<div class="sec"><h4>Recursos</h4>'+['cpu','ram','disk'].map(function(k){
+    var v=lv?d[k]:0;return '<div class="gauge"><span>'+GN[k]+'</span><div class="bar"><i data-bar="'+k+'" class="'+lvl(v)+'" style="width:'+v+'%"></i></div><b data-val="'+k+'">'+(lv?v+' %':'—')+'</b></div>'}).join('')+'</div>';
+  h+='<div class="sec"><h4>Red</h4><dl class="kv">'+
+    '<dt>Dirección IP</dt><dd>'+d.ip+'</dd>'+
+    '<dt>Máscara</dt><dd>255.255.255.0</dd>'+
+    '<dt>Puerta de enlace</dt><dd>'+s.gw+'</dd>'+
+    '<dt>Dirección MAC</dt><dd>'+d.mac+'</dd>'+
+    '<dt>'+(isHub?'Rol en la red':'Conectado a')+'</dt><dd>'+(isHub?(S.mode==='star'?'Centro de la estrella':'Cabecera del bus'):s.hub.name+' · '+s.pp+idx)+'</dd></dl></div>';
+  h+='<div class="sec"><h4>Sistema</h4><dl class="kv">'+
+    '<dt>Sistema</dt><dd>'+d.os+'</dd>'+
+    '<dt>Modelo</dt><dd>'+d.model+'</dd>'+
+    '<dt>Tiempo activo</dt><dd>'+(d.st==='boot'?'arrancando…':fmtUp(d.up))+'</dd>'+
+    '<dt>Último contacto</dt><dd>'+(lv?'hace unos segundos':d.st==='boot'?'en curso':'sin contacto')+'</dd></dl></div>';
+  h+='<div class="sec"><h4>Servicios</h4><div class="svc">'+d.svc.map(function(v){
+    return '<div><span>'+v[0]+'</span><span class="p">'+(v[1]||'—')+'</span><span class="s'+(lv?'':' off')+'">'+(lv?'Activo':'Inactivo')+'</span></div>'}).join('')+'</div></div>';
+  if(!d.log.length)d.log.push(['# sesión abierta como admin en '+d.name,'']);
+  h+='<div class="sec"><h4>Consola</h4><div class="con" id="con" role="log" aria-live="polite">'+d.log.map(function(l){return line(l[0],l[1])}).join('')+'</div></div>';
+  return h+'</div>';
+}
+function renderDrawer(){
+  var d=findDev(S.dev);if(!d)return;
+  var keep=$('#d-root .d-body');var st=keep?keep.scrollTop:0;
+  $('#d-root').innerHTML=drawerHTML(d);
+  var nb=$('#d-root .d-body');if(nb)nb.scrollTop=st;
+  paintActs(d);var con=$('#con');if(con)con.scrollTop=con.scrollHeight;
+}
+function paintActs(d){
+  var p=$('[data-act="ping"]'),r=$('[data-act="restart"]'),w=$('[data-act="power"]');if(!p)return;
+  p.disabled=d.busy;
+  r.disabled=d.busy||d.st==='down'||d.st==='boot';
+  w.disabled=d.st==='boot';
+  if(d.st==='down'){w.textContent='Encender';w.classList.remove('danger')}
+  else{w.classList.add('danger');w.textContent=d.armed?'Confirmar apagado':'Apagar'}
+}
+function say(d,t,c){
+  d.log.push([t,c||'']);
+  if(S.dev===d.id){var con=$('#con');if(con){con.insertAdjacentHTML('beforeend',line(t,c));con.scrollTop=con.scrollHeight}}
+}
+function openDrawer(id){
+  S.dev=id;renderDrawer();
+  $('#drawer').classList.add('open');$('#drawer').setAttribute('aria-hidden','false');$('#shade').classList.add('on');
+  var c=$('#d-close');if(c)c.focus();
+  clearInterval(S.timer);S.timer=setInterval(jitter,1500);
+}
+function closeDrawer(){
+  if(S.dev===null)return;
+  S.dev=null;clearInterval(S.timer);
+  $('#drawer').classList.remove('open');$('#drawer').setAttribute('aria-hidden','true');$('#shade').classList.remove('on');
+  if(S.opener&&document.body.contains(S.opener))S.opener.focus();
+}
+function jitter(){
+  var d=findDev(S.dev);if(!d||!live(d))return;
+  function cl(v,a,b){return Math.max(a,Math.min(b,v))}
+  d.cpu=cl(d.cpu+Math.round((Math.random()-.5)*10),3,97);
+  d.ram=cl(d.ram+Math.round((Math.random()-.5)*4),8,96);
+  ['cpu','ram'].forEach(function(k){
+    var b=$('[data-bar="'+k+'"]'),v=$('[data-val="'+k+'"]');if(!b)return;
+    b.style.width=d[k]+'%';b.className=lvl(d[k]);v.textContent=d[k]+' %';
+  });
+}
+$('#shade').addEventListener('click',closeDrawer);
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrawer()});
+$('#drawer').addEventListener('click',function(e){
+  if(e.target.closest('#d-close')){closeDrawer();return}
+  var b=e.target.closest('[data-act]');if(!b)return;
+  var d=findDev(S.dev);if(!d)return;
+  var a=b.getAttribute('data-act');
+  if(a==='ping')doPing(d);else if(a==='restart')doRestart(d);else if(a==='power')doPower(d);
+});
+
+/* ---------- acciones simuladas ---------- */
+function refresh(d){
+  updateSummary();renderStage(false);
+  if(S.dev===d.id)renderDrawer();
+}
+function doPing(d){
+  if(d.busy)return;d.busy=true;paintActs(d);
+  say(d,'$ ping -c 4 '+d.ip,'cmd');
+  var n=0,base=d.type==='iot'?14:d.type==='camera'?5:1.2,got=0;
+  var t=setInterval(function(){
+    n++;
+    if(d.st==='down'||d.st==='boot'){say(d,'Tiempo de espera agotado para icmp_seq='+n,'bad')}
+    else{got++;say(d,'64 bytes desde '+d.ip+': icmp_seq='+n+' ttl=62 tiempo='+(base+Math.random()*3).toFixed(1)+' ms')}
+    if(n===4){clearInterval(t);
+      say(d,'4 enviados, '+got+' recibidos, '+(got?'0':'100')+' % de pérdida',got?'good':'bad');
+      d.busy=false;paintActs(d)}
+  },450);
+}
+function doRestart(d){
+  if(d.busy||d.st==='down'||d.st==='boot')return;
+  var prev=d.st;d.st='boot';say(d,'$ reboot','cmd');say(d,'Orden de reinicio enviada a '+d.ip);refresh(d);
+  setTimeout(function(){say(d,'Apagando servicios…')},1000);
+  setTimeout(function(){say(d,'Arrancando sistema…')},2200);
+  setTimeout(function(){d.st=prev;d.up=0.1;say(d,'Servicios restablecidos. El equipo responde de nuevo.','good');refresh(d)},3800);
+}
+function doPower(d){
+  if(d.st==='boot')return;
+  if(d.st==='down'){
+    say(d,'$ power on','cmd');d.st='boot';refresh(d);
+    setTimeout(function(){say(d,'Arrancando sistema…')},1200);
+    setTimeout(function(){d.st='ok';d.note='';d.up=0.1;d.cpu=d.cpu||14;d.ram=d.ram||33;d.disk=d.disk||41;say(d,'Equipo encendido y en línea.','good');refresh(d)},3400);
+    return;
+  }
+  if(!d.armed){d.armed=true;paintActs(d);setTimeout(function(){if(d.armed){d.armed=false;paintActs(d)}},3500);return}
+  d.armed=false;say(d,'$ shutdown -h now','cmd');
+  d.st='down';d.note='Apagado manualmente desde NetDeck.';say(d,'Equipo apagado.','bad');refresh(d);
+}
+
+startBg();
+})();
+</script>
+
+</body></html>
